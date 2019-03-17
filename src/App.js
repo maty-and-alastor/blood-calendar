@@ -107,7 +107,8 @@ function UserControlMenu({ userId }) {
       firebase
         .auth()
         .currentUser.linkWithPopup(googleAuthProvider)
-        .then(forceUpdate);
+        .then(forceUpdate)
+        .catch(error => alert(error.message));
     }
   }
   return isAnonymous ? (
@@ -150,7 +151,14 @@ function NotLogedScreen({ userId /* null or map*/ }) {
     }
   }
   function loginExistingUser(e) {
-    firebase.auth().signInWithPopup(googleAuthProvider);
+    if (!loadingRef.current) {
+      loadingRef.current = true;
+      firebase
+        .auth()
+        .signInWithPopup(googleAuthProvider)
+        .catch(error => alert(error.message))
+        .finally(_ => (loadingRef.current = false));
+    }
   }
   const disableButtons = loadingRef.current === true;
 
