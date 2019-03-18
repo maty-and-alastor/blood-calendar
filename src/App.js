@@ -37,12 +37,13 @@ function isSameDay(d1 /*: DateTime*/, d2) {
   }
   return false;
 }
-function getDateColor(allDates, date) {
-  if (!allDates) return "default";
-  const foundedKey = Object.keys(allDates).find(docKey =>
+function findKey(allDates, date) {
+  return Object.keys(allDates).find(docKey =>
     isSameDay(allDates[docKey].date, date)
   );
+}
 
+function getDateColor(allDates, foundedKey) {
   return foundedKey ? allDates[foundedKey].color : "default";
 }
 
@@ -53,23 +54,27 @@ function CenterHorizontaly({ children }) {
 function StateManagement({ userId /* always a userId*/ }) {
   const [allMenstruationDates, updateAllMenstrationDates] = useState(undefined);
   console.log("Do we have allMenstrationDates", allMenstruationDates);
-  useEffect(() => {
-    let unsubscribeCallback = db
-      .collection("data")
-      .where("user", "==", userId)
-      .onSnapshot(querySnapshot => {
-        let data = {};
-        querySnapshot.forEach(doc => {
-          data[doc.id] = doc.data();
-          // convert stupid firebase timestamp to normal date
-          data[doc.id].date = data[doc.id].date.toDate();
+  useEffect(
+    () => {
+      let unsubscribeCallback = db
+        .collection("data")
+        .where("user", "==", userId)
+        .onSnapshot(querySnapshot => {
+          let data = {};
+          querySnapshot.forEach(doc => {
+            data[doc.id] = doc.data();
+            // convert stupid firebase timestamp to normal date
+            data[doc.id].date = data[doc.id].date.toDate();
+          });
+          updateAllMenstrationDates(data);
         });
-        updateAllMenstrationDates(data);
-      });
-    return unsubscribeCallback ? unsubscribeCallback : () => null;
-  }, [userId]);
+      return unsubscribeCallback ? unsubscribeCallback : () => null;
+    },
+    [userId]
+  );
   function addMenstruationDay(date) {
-    db.collection("data")
+    db
+      .collection("data")
       .doc()
       .set({
         user: userId,
@@ -77,9 +82,23 @@ function StateManagement({ userId /* always a userId*/ }) {
         color: "red"
       });
   }
+  function removeMenstruationDay(date) {
+    const foundedKey = findKey(allMenstruationDates, date);
+    if (foundedKey) {
+      db
+        .collection("data")
+        .doc(foundedKey)
+        .delete()
+        .catch(error => alert(error.message));
+    } else {
+      alert("Date not saved yet.")
+    }
+  }
   return allMenstruationDates ? (
     <div>
-      <CalendarWidget {...{ allMenstruationDates, addMenstruationDay }} />
+      <CalendarWidget
+        {...{ allMenstruationDates, addMenstruationDay, removeMenstruationDay }}
+      />
       <CenterHorizontaly>
         <UserControlMenu {...{ userId }} />
       </CenterHorizontaly>
@@ -94,10 +113,10 @@ function useForceUpdate() {
   return () => forceUpdate(x => x + 1);
 }
 
-function UserControlMenu({ userId }) {
+function UserControlMenu() {
   const forceUpdate = useForceUpdate();
   const isAnonymous = firebase.auth().currentUser.isAnonymous;
-  function logoutUser(e) {
+  function logoutUser() {
     if (!isAnonymous) {
       firebase.auth().signOut();
     }
@@ -120,7 +139,11 @@ function UserControlMenu({ userId }) {
   );
 }
 
-function CalendarWidget({ allMenstruationDates, addMenstruationDay }) {
+function CalendarWidget({
+  allMenstruationDates,
+  addMenstruationDay,
+  removeMenstruationDay
+}) {
   const [selectedDate, changeSelectedDay] = useState(new Date());
   return (
     <div className="App">
@@ -129,11 +152,19 @@ function CalendarWidget({ allMenstruationDates, addMenstruationDay }) {
         selected={selectedDate}
         onChange={e => changeSelectedDay(e)}
         dayClassName={curentDate =>
-          getDateColor(allMenstruationDates, curentDate)
+          allMenstruationDates
+            ? getDateColor(
+                allMenstruationDates,
+                findKey(allMenstruationDates, curentDate)
+              )
+            : "default"
         }
       />
-      <button onClick={e => addMenstruationDay(selectedDate)}>
+      <button onClick={() => addMenstruationDay(selectedDate)}>
         I am bleeding
+      </button>
+      <button onClick={() => removeMenstruationDay(selectedDate)}>
+        Ops wrong date
       </button>
     </div>
   );
@@ -141,23 +172,23 @@ function CalendarWidget({ allMenstruationDates, addMenstruationDay }) {
 
 function NotLogedScreen({ userId /* null or map*/ }) {
   const loadingRef = useRef(false);
-  function createNewUser(e) {
+  function createNewUser() {
     if (!loadingRef.current) {
       loadingRef.current = true;
       firebase
         .auth()
         .signInAnonymously()
-        .finally(_ => (loadingRef.current = false));
+        .finally(() => (loadingRef.current = false));
     }
   }
-  function loginExistingUser(e) {
+  function loginExistingUser() {
     if (!loadingRef.current) {
       loadingRef.current = true;
       firebase
         .auth()
         .signInWithPopup(googleAuthProvider)
         .catch(error => alert(error.message))
-        .finally(_ => (loadingRef.current = false));
+        .finally(() => (loadingRef.current = false));
     }
   }
   const disableButtons = loadingRef.current === true;
