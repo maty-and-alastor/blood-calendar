@@ -41,3 +41,22 @@
     transform: rotate(360deg);
   }
 }
+
+.dates-table {
+  width: 240px;
+  max-height: 300px;
+  min-height: 150px;
+  margin: 0 auto;
+  border: 2px solid gray;
+  box-shadow: 0 0 20px 1px rgba(0,0,0,0.75);
+  overflow-y: scroll;
+}
+
+.date-item {
+  border-bottom: 1px solid gray;
+  padding: 5px;
+}
+
+.date-item.selected {
+  background: coral;
+}
