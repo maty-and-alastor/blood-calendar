@@ -91,7 +91,7 @@ function StateManagement({ userId /* always a userId*/ }) {
         .delete()
         .catch(error => alert(error.message));
     } else {
-      alert("Date not saved yet.")
+      alert("Date not saved yet.");
     }
   }
   return allMenstruationDates ? (
@@ -139,6 +139,38 @@ function UserControlMenu() {
   );
 }
 
+function DatesTable({ allMenstruationDates, selectedDate }) {
+  const [tableShown, updateTableShown] = useState(false);
+  let sortedDates = [];
+
+  if (allMenstruationDates) {
+    sortedDates = Object.keys(allMenstruationDates)
+      .map(key => allMenstruationDates[key].date)
+      .sort((a, b) => a - b);
+  }
+  return (
+    <React.Fragment>
+      <div className="show-table-button">
+        <button onClick={() => updateTableShown(!tableShown)}>{ tableShown ? "Hide Table" : "Show Table" }</button>
+      </div>
+      {tableShown &&
+        <div className="dates-table">
+          {sortedDates.map(item => (
+            <div
+              key={item.toDateString()}
+              className={`date-item ${
+                isSameDay(item, selectedDate) ? "selected" : ""
+              }`}
+            >
+              {item.toDateString()}
+            </div>
+          ))}
+        </div>
+      }
+    </React.Fragment>
+  );
+}
+
 function CalendarWidget({
   allMenstruationDates,
   addMenstruationDay,
@@ -160,6 +192,7 @@ function CalendarWidget({
             : "default"
         }
       />
+      <DatesTable {...{ allMenstruationDates, selectedDate }} />
       <button onClick={() => addMenstruationDay(selectedDate)}>
         I am bleeding
       </button>
