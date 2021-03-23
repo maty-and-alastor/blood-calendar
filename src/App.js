@@ -1,11 +1,12 @@
 // @ts-check
 import React, { useState, useEffect, useRef } from "react";
 import "./App.css";
-import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import firebase from "firebase/app";
 import "firebase/auth";
 import "firebase/firestore";
+import Calendar from "react-calendar";
+import logo from "./images/logo.svg";
 
 const config = {
   apiKey: "AIzaSyD09OPJuYtRzTi-Q5BiPR1Rl_DY-b8bEbQ",
@@ -47,13 +48,13 @@ function getDateColor(allDates, foundedKey) {
   return foundedKey ? allDates[foundedKey].color : "default";
 }
 
-function CenterHorizontaly({ children }) {
+function CenterHorizontal({ children }) {
   return <div style={{ textAlign: "center" }}>{children}</div>;
 }
 
 function StateManagement({ userId /* always a userId*/ }) {
   const [allMenstruationDates, updateAllMenstrationDates] = useState(undefined);
-  console.log("Do we have allMenstrationDates", allMenstruationDates);
+  console.log("Do we have allMenstruationDates", allMenstruationDates);
   useEffect(
     () => {
       let unsubscribeCallback = db
@@ -72,15 +73,20 @@ function StateManagement({ userId /* always a userId*/ }) {
     },
     [userId]
   );
-  function addMenstruationDay(date) {
-    db
-      .collection("data")
-      .doc()
-      .set({
-        user: userId,
-        date: date,
-        color: "red"
-      });
+  function addMenstruationDay(date, color) {
+    const foundedKey = findKey(allMenstruationDates, date);
+    if (!foundedKey) {
+      db
+        .collection("data")
+        .doc()
+        .set({
+          user: userId,
+          date: date,
+          color: color
+        });
+    } else {
+      alert("Date already selected.");
+    }
   }
   function removeMenstruationDay(date) {
     const foundedKey = findKey(allMenstruationDates, date);
@@ -95,16 +101,16 @@ function StateManagement({ userId /* always a userId*/ }) {
     }
   }
   return allMenstruationDates ? (
-    <div>
+    <div className="app-wrapper">
+      <div className="logout">
+        <UserControlMenu {...{ userId }} />
+      </div>
       <CalendarWidget
         {...{ allMenstruationDates, addMenstruationDay, removeMenstruationDay }}
       />
-      <CenterHorizontaly>
-        <UserControlMenu {...{ userId }} />
-      </CenterHorizontaly>
     </div>
   ) : (
-    <CenterHorizontaly> Loading data from server</CenterHorizontaly>
+    <CenterHorizontal> Loading data from server</CenterHorizontal>
   );
 }
 
@@ -131,42 +137,43 @@ function UserControlMenu() {
     }
   }
   return isAnonymous ? (
-    <button onClick={linkAnonymousUserToGoogleAccount}>
+    <button className="custom-button" onClick={linkAnonymousUserToGoogleAccount}>
       Login with gmail to sync your data
     </button>
   ) : (
-    <button onClick={logoutUser}>Logout</button>
+    <React.Fragment>
+      <button className="custom-button" onClick={logoutUser}>Logout</button>
+      <span className="user-email">{firebase.auth().currentUser.email}</span>
+    </React.Fragment>
   );
 }
 
-function DatesTable({ allMenstruationDates, selectedDate }) {
+function DatesTable({ sortedDates, selectedDate }) {
   const [tableShown, updateTableShown] = useState(false);
-  let sortedDates = [];
 
-  if (allMenstruationDates) {
-    sortedDates = Object.keys(allMenstruationDates)
-      .map(key => allMenstruationDates[key].date)
-      .sort((a, b) => a - b);
-  }
   return (
     <React.Fragment>
       <div className="show-table-button">
-        <button onClick={() => updateTableShown(!tableShown)}>{ tableShown ? "Hide Table" : "Show Table" }</button>
+        <button className="custom-button" onClick={() => updateTableShown(!tableShown)}>
+          {tableShown ? "Hide Table" : "Show Table"}
+        </button>
       </div>
-      {tableShown &&
-        <div className="dates-table">
-          {sortedDates.map(item => (
-            <div
-              key={item.toDateString()}
-              className={`date-item ${
-                isSameDay(item, selectedDate) ? "selected" : ""
-              }`}
-            >
-              {item.toDateString()}
-            </div>
-          ))}
+      {tableShown && (
+        <div className="dates-table-wrapper">
+          <div className="dates-table">
+            {sortedDates.map(item => (
+              <div
+                key={item.toDateString()}
+                className={`date-item ${
+                  isSameDay(item, selectedDate) ? "selected" : ""
+                }`}
+              >
+                {item.toDateString()}
+              </div>
+            ))}
+          </div>
         </div>
-      }
+      )}
     </React.Fragment>
   );
 }
@@ -177,28 +184,50 @@ function CalendarWidget({
   removeMenstruationDay
 }) {
   const [selectedDate, changeSelectedDay] = useState(new Date());
+  let sortedDates = [];
+
+  if (allMenstruationDates) {
+    allMenstruationDates["guess1"] = {color: "blue", date: new Date()};
+    sortedDates = Object.keys(allMenstruationDates)
+      .filter(key => allMenstruationDates[key].color === "red")
+      .map(key => allMenstruationDates[key].date)
+      .sort((a, b) => a - b);
+
+    for (let i = 0; i<6; i++) {
+      const temp = sortedDates[sortedDates.length-1];
+      allMenstruationDates[i] = {color : "blue", date: new Date(temp.setDate(temp.getDate() + (13 + i)))};
+    }
+
+    console.log("eeey ", sortedDates[sortedDates.length-1], " all ", allMenstruationDates);
+  }
   return (
     <div className="App">
-      <DatePicker
-        inline
-        selected={selectedDate}
-        onChange={e => changeSelectedDay(e)}
-        dayClassName={curentDate =>
-          allMenstruationDates
-            ? getDateColor(
-                allMenstruationDates,
-                findKey(allMenstruationDates, curentDate)
-              )
-            : "default"
-        }
-      />
-      <DatesTable {...{ allMenstruationDates, selectedDate }} />
-      <button onClick={() => addMenstruationDay(selectedDate)}>
-        I am bleeding
-      </button>
-      <button onClick={() => removeMenstruationDay(selectedDate)}>
-        Ops wrong date
-      </button>
+      <div className="app-panel">
+        <Calendar
+          value={selectedDate}
+          onChange={e => changeSelectedDay(e)}
+          tileClassName={({ date }) =>
+            allMenstruationDates
+              ? getDateColor(
+                  allMenstruationDates,
+                  findKey(allMenstruationDates, date)
+                )
+              : "default"
+          }
+        />
+        <div className="button-panel">
+          <button className="custom-button" onClick={() => removeMenstruationDay(selectedDate)}>
+            X
+          </button>
+          <DatesTable {...{ sortedDates, selectedDate }} />
+          <button className="custom-button" onClick={() => addMenstruationDay(selectedDate, "red")}>
+            Au
+          </button>
+          <button className="custom-button" onClick={() => addMenstruationDay(selectedDate, "coral")}>
+            Still Au
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -229,14 +258,18 @@ function NotLogedScreen({ userId /* null or map*/ }) {
   return userId ? (
     <StateManagement {...{ userId }} />
   ) : (
-    <CenterHorizontaly>
-      <button disabled={disableButtons} onClick={createNewUser}>
+    <div className="logged-out-screen">
+      <div className="logo">
+        <img src={logo} alt="logo" />
+        <span>Choose login</span>
+      </div>
+      <button className="custom-button" disabled={disableButtons} onClick={createNewUser}>
         Create new user for me
       </button>
-      <button disabled={disableButtons} onClick={loginExistingUser}>
+      <button className="custom-button" disabled={disableButtons} onClick={loginExistingUser}>
         I am existing user i want to log in
       </button>
-    </CenterHorizontaly>
+    </div>
   );
 }
 
@@ -247,6 +280,7 @@ function AuthUser() {
       console.log("On auth state change!!!!!", user);
       if (user) {
         // User is signed in.
+        console.log("user ", user);
         console.log("We have user", user.uid, user.isAnonymous);
         setUserId(user.uid);
       } else {
@@ -256,7 +290,7 @@ function AuthUser() {
     });
   }, []);
   return userId === undefined ? (
-    <CenterHorizontaly>Trying to sign in</CenterHorizontaly>
+    <CenterHorizontal>Trying to sign in</CenterHorizontal>
   ) : (
     <NotLogedScreen {...{ userId }} />
   );
